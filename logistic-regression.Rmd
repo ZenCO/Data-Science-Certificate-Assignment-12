@@ -1,25 +1,17 @@
 ---
 title: "Logistic Regression"
-author: "Francesco Bonifazi"
-date: "7/8/2019"
+author: "Chase Smith"
+date: "7/10/2019"
 output: html_document
 ---
-
-```{r}
-install.packages("tidyverse")
-install.packages("modelr")
-install.packages("caret")
-install.packages("titanic")
-install.packages("e1071")
-```
 
 ```{r setup, include=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library("tidyverse")
 library("modelr")
 library("caret")
-library("e1071")
 ```
+
 
 # Logistic regression (Again!)
 
@@ -38,6 +30,7 @@ dat = raw_dat %>%
   select(-Ticket, -Name, -Cabin) %>%
   as_tibble()
 ```
+
 
 # "By Hand"
 ```{r}
@@ -59,7 +52,13 @@ train_dat = dat %>% sample_frac(training_split)
 test_dat = dat %>% anti_join(train_dat, by = 'PassengerId')
 ```
 
+# Clean up data to remove ID
 
+```{r}
+train_dat = train_dat %>% select(-PassengerId)
+test_dat = test_dat %>% select(-PassengerId)
+```
+```
 
 ```{r}
 mod1 = glm(Survived ~ ., family = binomial(link = 'logit'), data = train_dat)
@@ -85,6 +84,8 @@ summary(mod4)
 ```
 
 
+
+
 ## Test your model's accuracy
 ```{r}
 cutoff_level = 0.5
@@ -102,7 +103,7 @@ cm
 ```
 
 
-## How does it compare to null error rate?
+## How does it compare to null error rate?  CM = 79% Accuracy vs Null Error Rate = 62%
 
 ```{r}
 # Null error rate is defined as always guessing the higher probability (in this case, did not survive)
@@ -133,11 +134,11 @@ tn
 fn
 fp
 #tp_rate =  # aka "sensitivity" or "recall" when yes, how often does it predict yes?
-tp_rate = tp + fn
+tp_rate = tp / (tp + fn)
 tp_rate
 
 #fp_rate =  # aka "specificity" when no, how often does it predict yes?
-fp_rate = fp + tn
+fp_rate = fp / (fp + tn)
 fp_rate
 ```
 
@@ -165,9 +166,40 @@ print(fp_rate)
 }
 ```
 
+
+
+```{r}
+model_cutoff = function(df, mod, cutoff_level){ 
+  
+  results = df %>%
+    add_predictions(model = mod, var = 'pred', type = 'response') %>%
+    mutate(pred_binary = factor(if_else(pred <= cutoff_level, 0, 1)))
+  
+  cm = confusionMatrix(data=results$pred_binary, reference=results$Survived)
+  
+  conf_mat = cm$table
+  tn = conf_mat[1,1]
+  fn = conf_mat[2,1]
+  fp = conf_mat[1, 2] 
+  tp = conf_mat[2, 2]
+  
+  tp_rate = tp / (tp + fn) # aka "sensitivity" or "recall" when yes, how often does it predict yes?
+  fp_rate = fp / (tn + fp) # aka "specificity" when no, how often does it predict yes?
+  
+  final_results = tibble(
+    cutoff_level = cutoff_level,
+    tp_rate = tp_rate,
+    fp_rate = fp_rate
+  )
+  
+  return(final_results)
+}
+```
+
 ```{r}
 
 model_cutoff(results, mod4, .5)
+```
 
 ```
 
